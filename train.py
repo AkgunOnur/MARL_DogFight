@@ -14,7 +14,7 @@ import torch.nn as nn
 from stable_baselines3.common.env_checker import check_env
 # from monitor_new import Monitor
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
-from stable_baselines3 import A2C, PPO, DQN
+from stable_baselines3 import A2C, PPO, DQN, SAC, DDPG, TD3
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor, VecNormalize
 from env_util import make_vec_env
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -57,14 +57,16 @@ class CustomCNN(BaseFeaturesExtractor):
 
 
 def main(args):
-    np.random.seed(args.seed)
+    # np.random.seed(args.seed)
     
     # train_env = SubprocVecEnv([make_env(easy_map) for j in range(args.n_procs)])
     # train_env = AgentFormation(generated_map=easy_map)
     # train_env = VecMonitor(train_env, filename = model_dir)
-    model_name = "PPO"
-    model_def = PPO
     N_eval = 1000
+
+    model_list = [DDPG, TD3, SAC, A2C]
+    model_names = ["DDPG", "TD3", "SAC", "A2C"]
+    curriculum_list = ["level1", "level2"]
 
     activation_list = [nn.Tanh]
     gamma_list = [0.9]
@@ -76,51 +78,52 @@ def main(args):
 
     model_dir = args.out + "/saved_models"
 
-    level = "moving_target"
 
-    current_folder = args.out + "/outputs_" + level
-    if not os.path.exists(current_folder):
-        os.makedirs(current_folder)
+    for index, current_model in enumerate(model_list): 
+        print (f"RL Algorithm: {current_model} \n\n")
+        for curriculum in curriculum_list:
+            print (f"Curriculum Level: {curriculum} \n\n")
+            level = "moving_target_" + model_names[index] + "_" + curriculum
 
-    train_env = make_vec_env(lambda: MovingTarget(), n_envs=args.n_procs, monitor_dir=current_folder, vec_env_cls=SubprocVecEnv)
-    # train_env = MovingTarget()
-    # train_env = AgentFormation(generated_map=gen_map, map_lim=args.map_lim, max_steps=250)
-    # train_env = Monitor(train_env, current_folder + "/monitor.csv")
-    # train_env = VecNormalize(train_env, norm_obs= False, norm_reward=True, clip_reward = max_possible_reward)
-    train_env.reset()
-    # model = model_def('MlpPolicy', train_env, policy_kwargs=dict(net_arch=[256, 256]), tensorboard_log="./" + args.out + "/" + model_name + "_tensorboard/")
-    policy_kwargs = dict(net_arch=net_list[0], activation_fn=activation_list[0])
-    model = model_def('MlpPolicy', train_env, n_epochs=ne_list[0],gamma=gamma_list[0], batch_size=bs_list[0], learning_rate=lr_list[0],
-                    n_steps = ns_list[0],  policy_kwargs=policy_kwargs, tensorboard_log="./" + args.out + "/" + model_name + "_tensorboard/")
-    
-    # policy_kwargs = dict(features_extractor_class=CustomCNN, net_arch=net_list[0], features_extractor_kwargs=dict(features_dim=net_list[0][0]), activation_fn=activation_list[0])
-    # model = model_def('CnnPolicy', train_env, n_epochs=ne_list[0],gamma=gamma_list[0], batch_size=bs_list[0], learning_rate=lr_list[0],
-    #             n_steps = ns_list[0],  policy_kwargs=policy_kwargs, tensorboard_log="./" + args.out + "/" + model_name + "_tensorboard/")
-    
-    eval_env = MovingTarget()
+            current_folder = args.out + "/" + level
+            if not os.path.exists(current_folder):
+                os.makedirs(current_folder)
 
-    callback = EvalCallback(eval_env=eval_env, eval_freq = N_eval // args.n_procs, log_path  = args.out + "/" + model_name + "_" + level +"_log",
-                            best_model_save_path = model_dir + "/best_model_" + level, deterministic=False, verbose=1)
-
-    start = time.time()
-    model.learn(total_timesteps=args.train_timesteps, tb_log_name=model_name + "_run_" + level, callback=callback)
-    model.save(model_dir + "/last_model_" + level)
-    elapsed_time = time.time() - start
-    print (f"Elapsed time: {elapsed_time:.5}")
-
-    
+            # train_env = make_vec_env(lambda: MovingTarget(), n_envs=args.n_procs, monitor_dir=current_folder, vec_env_cls=SubprocVecEnv)
+            train_env = MovingTarget(visualization=False, level = curriculum)
+            train_env = Monitor(train_env, current_folder + "/monitor.csv")
+            # train_env = VecNormalize(train_env, norm_obs= False, norm_reward=True, clip_reward = max_possible_reward)
+            train_env.reset()
+            if curriculum == "level1":
+                model = current_model("MlpPolicy", train_env,  verbose=1, tensorboard_log="./" + args.out + "/" + model_names[index] + "_" + curriculum +  "_tensorboard/")
+            else:
+                model = current_model.load(model_dir + "/best_model_" + "moving_target_" + model_names[index] + "_" + curriculum_list[0] + "/best_model", verbose=1) # + "/best_model"
             
+            model.set_env(train_env)
+            
+            
+            eval_env = MovingTarget()
 
-    train_env.close()
+            callback = EvalCallback(eval_env=eval_env, eval_freq = N_eval, log_path  = args.out + "/" + model_names[index] + "_" + level +"_log",
+                                    best_model_save_path = model_dir + "/best_model_" + level, deterministic=False, verbose=1)
+
+            start = time.time()
+            model.learn(total_timesteps=args.train_timesteps, tb_log_name=model_names[index] + "_run_" + level, callback=callback)
+            model.save(model_dir + "/last_model_" + level)
+            elapsed_time = time.time() - start
+            print (f"Elapsed time: {elapsed_time:.5}")
+
+            train_env.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='RL trainer')
     # test
-    parser.add_argument('--train_timesteps', default=1000, type=int, help='number of test iterations')
+    parser.add_argument('--train_timesteps', default=5000000, type=int, help='number of test iterations')
     # parser.add_argument('--eval_episodes', default=3, type=int, help='number of test iterations')
     parser.add_argument('--n_procs', default=8, type=int, help='number of processes to execute')
     parser.add_argument('--seed', default=7, type=int, help='seed number for test')
     parser.add_argument('--out', default="output", type=str, help='the output folder')
+    parser.add_argument('--load', default="", type=str, help='model to be loaded')
     args = parser.parse_args()
     
     main(args)

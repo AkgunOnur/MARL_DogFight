@@ -10,14 +10,14 @@ import time
 
 
 class MovingTarget(gym.Env):
-    def __init__(self, dog_fight_range=25.0, detection_angle=60.0, opponent_range=25.0, opponent_angle=60.0, name="A", opponent="B", locked_reward=1.0, get_locked_reward=-0.8, visualization = False):
+    def __init__(self, dog_fight_range=25.0, detection_angle=60.0, opponent_range=25.0, opponent_angle=60.0, name="A", opponent="B", locked_reward=1.0, get_locked_reward=-0.8, visualization = False, level = None):
         self.dt = .05
         self.max_angular_velocity = 1.0
         self.min_velocity = 1.5
         self.max_velocity = 4.0
         self.x_target = 0.
         self.y_target = 0.
-        self.v_target = 2.0
+        self.v_target = 0.0
         self.psi_target = 0.
         self.psi_goal = 0.
         self.viewer = None
@@ -37,20 +37,21 @@ class MovingTarget(gym.Env):
         self.name2 = opponent
         self.reward_range = 2
         self.visualization = visualization
+        self.level = level
         # self.metadata = {'render.modes': ['human']}
 
-        high = np.array([self.map_lim, self.map_lim, np.pi], dtype=np.float32)
+        # self.action_space = spaces.Box(
+        #     low=np.array([-np.float32(self.max_angular_velocity), np.float32(self.min_velocity)]),
+        #     high=np.array([np.float32(self.max_angular_velocity), np.float32(self.max_velocity)]), shape=(2,),
+        #     dtype=np.float32
+        # )
         self.action_space = spaces.Box(
-            low=np.array([-np.float32(self.max_angular_velocity), np.float32(self.min_velocity)]),
-            high=np.array([np.float32(self.max_angular_velocity), np.float32(self.max_velocity)]), shape=(2,),
-            dtype=np.float32
-        )
-        self.observation_space = spaces.Box(
-            low=-np.float32(1.0),
-            high=np.float32(1.0),
-            shape=(11,),
-            dtype=np.float32
-        )
+            np.array([-self.max_angular_velocity, self.min_velocity]).astype(np.float32),
+            np.array([self.max_angular_velocity, self.max_velocity]).astype(np.float32))
+
+        high = np.array([-1] * 11).astype(np.float32)
+
+        self.observation_space = spaces.Box(low=-high, high=high)
 
         self.seed()
 
@@ -84,16 +85,11 @@ class MovingTarget(gym.Env):
     def step(self, action1):
         dt = self.dt
         info = dict()
-        # u_angular = np.clip(u_angular, -self.max_angular_velocity, self.max_angular_velocity)
-        # u_linear = np.clip(u_linear, 1., self.max_velocity)
         done = False
         locked, get_locked = False, False
         reward = 0
 
-        done1, done2 = False, False
-        locked1, locked2 = False, False
-        reward1, reward2 = 0, 0
-        x1, y1, psi1, x1_diff, y1_diff, psi1_diff, x1_dot, y1_dot, psi1_dot, distance, diff_angle_1, diff_angle_2 = self.state1 
+        x1, y1, psi1, x1_diff, y1_diff, psi1_diff, x1_dot, y1_dot, psi1_dot, distance, diff_angle, diff_angle_1 = self.state1 
         #Target moves
         self.x_target += (self.v_target * np.cos(self.psi_target + np.pi/2) * dt)
         self.y_target += (self.v_target * np.sin(self.psi_target + np.pi/2) * dt)
@@ -102,6 +98,7 @@ class MovingTarget(gym.Env):
             self.psi_target += (np.pi*10/12) 
 
         u_angular1, u_linear1 = action1
+
         x1, y1, psi1, x1_dot, y1_dot = self.dubin_model(x1, y1, psi1, u_angular1, u_linear1)
 
         x1_diff = self.x_target - x1
@@ -119,16 +116,21 @@ class MovingTarget(gym.Env):
         end_angle_2 = angle_normalize_2pi(self.psi_target + np.pi/2 + self.opponent_angle/2*np.pi/180)
         diff_angle_2 = angle_normalize_2pi(np.arctan2(y1-self.y_target, x1-self.x_target))
 
+        diff_angle = angle_normalize(psi1-self.psi_target)
+
         if x1 > self.map_lim or x1 < -self.map_lim or y1 > self.map_lim or y1 < -self.map_lim:
             reward = -1.0
             done = True
             # print (f"\nPlane {self.name1} is out of map!")
         elif distance <= 2.0:
+            reward = -0.8
+            # print (f"\nPlane {self.name1} and {self.name2} crashed!")
+        elif distance >= 50.0:
             reward = -1.0
             done = True
-            # print (f"\nPlane {self.name1} and {self.name2} crashed!")
         else:
-            reward = np.clip(-distance / max_dist, -1.0, 1.0)
+            # reward = np.clip(-0.4*distance / max_dist -0.6*np.abs(diff_angle_1)/(2*np.pi), -1.0, 1.0)
+            reward = np.clip(-0.5*distance / max_dist - 0.5*np.abs(diff_angle) / np.pi + 0.6 * u_linear1/self.max_velocity, -1.0, 1.0)
             if distance <= self.dog_fight_range:
                 if end_angle_1 > start_angle_1:
                     if start_angle_1 < diff_angle_1 < end_angle_1:
@@ -169,10 +171,10 @@ class MovingTarget(gym.Env):
             if done:
                 self.close()
 
-        self.state1 = (x1, y1, psi1, x1_diff, y1_diff, psi1_diff, x1_dot, y1_dot, u_angular1, distance, diff_angle_1, diff_angle_2)
+        self.state1 = (x1, y1, psi1, x1_diff, y1_diff, psi1_diff, x1_dot, y1_dot, u_angular1, distance, diff_angle, diff_angle_1)
 
-        # print (f"reward: {reward:.4} done: {done}")
-        # time.sleep(0.25)
+        # print (f"reward: {reward:.4} diff: {diff_angle*180/np.pi:.4} angular: {action1[0]:.4} linear: {action1[1]:.4}")
+        # time.sleep(0.1)
         return self._get_obs(self.state1), reward, done, info
 
 
@@ -182,14 +184,12 @@ class MovingTarget(gym.Env):
         pos_coeff = self.map_lim
         vel_coeff = self.max_velocity
         angle_coeff = np.pi
-        # print ("scenario: ", self.scenario)
-        # print ("state1: ", state1)
             
-        x1, y1, psi1, x1_diff, y1_diff, psi1_diff, x1_dot, y1_dot, u_angular, distance, diff_angle_1, diff_angle_2 = state1
+        x1, y1, psi1, x1_diff, y1_diff, psi1_diff, x1_dot, y1_dot, u_angular, distance, diff_angle, diff_angle_1 = state1
 
         obs_state1 = np.array([x1/pos_coeff, y1/pos_coeff, x1_diff/pos_coeff, y1_diff/pos_coeff, psi1_diff/angle_coeff, 
                                 x1_dot/vel_coeff, y1_dot/vel_coeff, u_angular, distance/(np.sqrt(2)*2*pos_coeff), 
-                                diff_angle_1/(2*angle_coeff), diff_angle_2/(2*angle_coeff)])
+                                diff_angle/angle_coeff, diff_angle_1/(2*angle_coeff)])
 
         # print ("obs: ", obs_state1)
         return obs_state1
@@ -216,9 +216,15 @@ class MovingTarget(gym.Env):
         self.y_target = self.np_random.uniform(low=map_lim_1, high=map_lim_2)
         self.psi_target = self.np_random.uniform(low=-np.pi, high=np.pi)
 
+        if self.level == "level1":
+            self.v_target = 0
+        else:
+            self.v_target = self.np_random.uniform(low=1.5, high=4.0)
+        diff_angle = angle_normalize(psi1-self.psi_target)
+
         distance = np.sqrt((self.x_target - x1)**2 + (self.y_target - y1)**2)
 
-        self.state1 = np.array([x1, y1, psi1, self.x_target - x1, self.y_target - y1, self.psi_target - psi1, x1_dot, y1_dot, psi1_dot, distance, 0., 0.])
+        self.state1 = np.array([x1, y1, psi1, self.x_target - x1, self.y_target - y1, self.psi_target - psi1, x1_dot, y1_dot, psi1_dot, distance, diff_angle, 0.])
 
         return self._get_obs(state1 = self.state1)
 

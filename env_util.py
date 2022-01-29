@@ -1,7 +1,7 @@
 import os
 from typing import Any, Callable, Dict, Optional, Type, Union
 import gym
-from monitor_new import Monitor
+from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.atari_wrappers import AtariWrapper
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecEnv
 

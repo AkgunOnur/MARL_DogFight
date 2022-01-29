@@ -9,7 +9,7 @@ from numpy.random import default_rng
 import os
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
-from stable_baselines3 import A2C, PPO
+from stable_baselines3 import A2C, PPO, SAC
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from moving_target_env import MovingTarget
@@ -17,7 +17,7 @@ from moving_target_env import MovingTarget
 
 
 def main():
-    scenario = "moving_target"
+    scenario = "moving_target_sac_2"
     model_dir = 'output/saved_models/'
     visualization = True
 
@@ -27,14 +27,9 @@ def main():
     args = parser.parse_args()
     os.makedirs(model_dir, exist_ok=True)
 
-    # env = SubprocVecEnv([make_env(i) for i in range(num_cpu)], reward_range=reward_range)
-    
-    # with open('saved_maps_' + str(map_lim) + '.pickle', 'rb') as handle:
-    #     easy_list, medium_list, gen_list = pickle.load(handle)
-
 
     total_reward_list = []
-    model = PPO.load(model_dir + "/best_model_" + scenario + "/best_model", verbose=1) # + "/best_model"
+    model = SAC.load(model_dir + "/best_model_" + scenario + "/best_model", verbose=1) # + "/best_model"
     env = MovingTarget(visualization=visualization)
     # episode_rewards, episode_lengths = evaluate_policy(model, env, n_eval_episodes=args.eval_episodes,
     #         render=False,
