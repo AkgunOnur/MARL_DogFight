@@ -13,6 +13,7 @@ from stable_baselines3 import A2C, PPO, SAC
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from moving_target_env import MovingTarget
+from dog_fight_env import DogFight
 
 
 
@@ -30,7 +31,7 @@ def main():
 
     total_reward_list = []
     model = SAC.load(model_dir + "/best_model_" + scenario + "/best_model", verbose=1) # + "/best_model"
-    env = MovingTarget(visualization=visualization)
+    env = DogFight(visualization=visualization)
     # episode_rewards, episode_lengths = evaluate_policy(model, env, n_eval_episodes=args.eval_episodes,
     #         render=False,
     #         deterministic=False,

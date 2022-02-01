@@ -10,6 +10,7 @@ from matplotlib import pyplot as plt
 from numpy.random import default_rng
 
 from moving_target_env import MovingTarget
+from dog_fight_env import DogFight
 import torch.nn as nn
 from stable_baselines3.common.env_checker import check_env
 # from monitor_new import Monitor
@@ -64,17 +65,9 @@ def main(args):
     # train_env = VecMonitor(train_env, filename = model_dir)
     N_eval = 1000
 
-    model_list = [DDPG, TD3, SAC, A2C]
-    model_names = ["DDPG", "TD3", "SAC", "A2C"]
+    model_list = [SAC]
+    model_names = ["SAC"]
     curriculum_list = ["level1", "level2"]
-
-    activation_list = [nn.Tanh]
-    gamma_list = [0.9]
-    bs_list = [64]
-    lr_list = [3e-4]
-    net_list = [[64, 64]]
-    ns_list = [2048]
-    ne_list = [10]
 
     model_dir = args.out + "/saved_models"
 
@@ -83,14 +76,20 @@ def main(args):
         print (f"RL Algorithm: {current_model} \n\n")
         for curriculum in curriculum_list:
             print (f"Curriculum Level: {curriculum} \n\n")
-            level = "moving_target_" + model_names[index] + "_" + curriculum
+            level = args.scenario + "_" + model_names[index] + "_" + curriculum
 
             current_folder = args.out + "/" + level
             if not os.path.exists(current_folder):
                 os.makedirs(current_folder)
 
-            # train_env = make_vec_env(lambda: MovingTarget(), n_envs=args.n_procs, monitor_dir=current_folder, vec_env_cls=SubprocVecEnv)
-            train_env = MovingTarget(visualization=False, level = curriculum)
+            if args.scenario == "moving_target":
+                # train_env = make_vec_env(lambda: MovingTarget(), n_envs=args.n_procs, monitor_dir=current_folder, vec_env_cls=SubprocVecEnv)
+                train_env = MovingTarget(visualization=False, level = curriculum)
+                eval_env = MovingTarget(level = curriculum)
+            elif args.scenario == "dog_fight":
+                train_env = DogFight(visualization=False, level = curriculum)
+                eval_env = DogFight(level = curriculum)
+
             train_env = Monitor(train_env, current_folder + "/monitor.csv")
             # train_env = VecNormalize(train_env, norm_obs= False, norm_reward=True, clip_reward = max_possible_reward)
             train_env.reset()
@@ -101,9 +100,6 @@ def main(args):
             
             model.set_env(train_env)
             
-            
-            eval_env = MovingTarget()
-
             callback = EvalCallback(eval_env=eval_env, eval_freq = N_eval, log_path  = args.out + "/" + model_names[index] + "_" + level +"_log",
                                     best_model_save_path = model_dir + "/best_model_" + level, deterministic=False, verbose=1)
 
@@ -118,12 +114,13 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='RL trainer')
     # test
-    parser.add_argument('--train_timesteps', default=5000000, type=int, help='number of test iterations')
+    parser.add_argument('--train_timesteps', default=2000000, type=int, help='number of test iterations')
     # parser.add_argument('--eval_episodes', default=3, type=int, help='number of test iterations')
     parser.add_argument('--n_procs', default=8, type=int, help='number of processes to execute')
     parser.add_argument('--seed', default=7, type=int, help='seed number for test')
     parser.add_argument('--out', default="output", type=str, help='the output folder')
     parser.add_argument('--load', default="", type=str, help='model to be loaded')
+    parser.add_argument('--scenario', default="dog_fight", type=str, help='the output folder')
     args = parser.parse_args()
     
     main(args)
