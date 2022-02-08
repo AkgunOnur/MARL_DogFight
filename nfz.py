@@ -3,7 +3,7 @@ from gym import spaces
 from gym.utils import seeding
 import numpy as np
 from os import path
-from gym.envs.classic_control import rendering
+#from gym.envs.classic_control import rendering
 import pprint
 import time
 
@@ -235,23 +235,23 @@ class NFZone(gym.Env):
         #      [relative x, relative y, agent_heading-angle_between, rocket_heading-angle_between, agent_vel - rock-vel, fired_status] - Rocket2
 
         #Default reward
-        self.reward =  -np.sqrt((self.state[0])**2 + (self.state[1])** 2) - 10 * np.abs(self.state[2])
+        self.reward =  np.sqrt((self.state[0])**2 + (self.state[1])** 2)
         
         #Going outside map
         if(abs(self.agent["x"]) >= 50 or abs(self.agent["y"]) >= 50):
             self.done = True
-            self.reward = -500
+            self.reward -= 10
         #Hit by rocket
         elif(np.sqrt((self.state[11])**2 + (self.state[12]) ** 2) <= 3.0 or np.sqrt((self.state[17])**2 + (self.state[18]) ** 2) <= 3.0):
             self.done = True
-            self.reward = -200
+            self.reward -= 20
         #Reaching target
         elif(np.sqrt((self.state[0])**2 + (self.state[1]) ** 2) <= 3.0):
             self.done = True
-            self.reward = 2000
+            self.reward += 200
         #Getting in NFZ    
         elif((np.sqrt(self.state[3]**2 + self.state[4] ** 2) <= self.state[6]/2) or (np.sqrt(self.state[7]**2 + self.state[8] ** 2) <= self.state[10]/2)):
-            self.reward = -200
+            self.reward -= 5
         return self.state, self.reward, self.done, {}
 
     ########################################

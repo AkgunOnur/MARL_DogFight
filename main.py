@@ -13,7 +13,7 @@ MODE = 'train'
 timesteps = 1e6
 
 # Save a checkpoint every 2000 steps
-checkpoint_callback = CheckpointCallback(save_freq=50000, save_path='./model/',
+checkpoint_callback = CheckpointCallback(save_freq=100000, save_path='./model/',
                                          name_prefix='rl_model')
 
 #Wrap the custom environment and check it
