@@ -1,5 +1,7 @@
 import numpy as np
 import torch
+from dog_fight_env import DogFight
+from moving_target_env import MovingTarget
 
 
 class ReplayBuffer(object):

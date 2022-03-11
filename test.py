@@ -1,12 +1,10 @@
+import os
 import torch
 import time
 import pickle
 import argparse
 import numpy as np
 from numpy.random import default_rng
-
-
-import os
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3 import A2C, PPO, SAC
@@ -15,23 +13,11 @@ from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv
 from moving_target_env import MovingTarget
 from dog_fight_env import DogFight
 
-
-
-def main():
-    scenario = "moving_target_sac_2"
-    model_dir = 'output/saved_models/'
-    visualization = True
-
-    parser = argparse.ArgumentParser(description='RL trainer')
-    parser.add_argument('--eval_episodes', default=10, type=int, help='number of test iterations')
-
-    args = parser.parse_args()
-    os.makedirs(model_dir, exist_ok=True)
-
-
+def main(args):
+    scenario_name = str(args.scenario).split('\'')[1].split('.')[-1]
     total_reward_list = []
-    model = SAC.load(model_dir + "/best_model_" + scenario + "/best_model", verbose=1) # + "/best_model"
-    env = DogFight(visualization=visualization)
+    model = args.model.load(args.main_folder + "/" + args.model_folder + "/best_model", verbose=1) # + "/best_model"
+    env = args.scenario(visualization=args.visualize, max_timesteps=1000, level="level2")
     # episode_rewards, episode_lengths = evaluate_policy(model, env, n_eval_episodes=args.eval_episodes,
     #         render=False,
     #         deterministic=False,
@@ -60,12 +46,21 @@ def main():
     print ("Mean reward: {0:.3f}, Std. reward: {1:.3f}, in {2} episodes".format(np.mean(total_reward_list), np.std(total_reward_list), args.eval_episodes))
 
     
-    with open('new_results_' + scenario + '.pickle', 'wb') as handle:
+    with open('new_results_' + scenario_name + '.pickle', 'wb') as handle:
         pickle.dump(total_reward_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-    if visualization:
+    if args.visualize:
         env.close()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='RL trainer')
+    parser.add_argument('--model', default=SAC, help='model type')
+    parser.add_argument('--scenario', default=MovingTarget, help='scenario type')
+    parser.add_argument('--eval_episodes', default=10, type=int, help='number of test iterations')
+    parser.add_argument('--model_folder', default="moving_target_SAC_level1_cur_200k", type=str, help='the output folder')
+    parser.add_argument('--main_folder', default="output/saved_models/", type=str, help='the output folder')
+    parser.add_argument('--visualize', default = True, action='store_true', help='to visualize')
+
+    args = parser.parse_args()
+    main(args)
 

@@ -10,11 +10,11 @@ import time
 
 
 class MovingTarget(gym.Env):
-    def __init__(self, dog_fight_range=25.0, detection_angle=60.0, opponent_range=25.0, opponent_angle=60.0, name="A", opponent="B", locked_reward=1.0, get_locked_reward=-0.8, visualization = False, level = None):
+    def __init__(self, dog_fight_range=25.0, detection_angle=60.0, opponent_range=25.0, opponent_angle=60.0, name="A", opponent="B", locked_reward=1.0, get_locked_reward=-0.8, max_timesteps=2000, visualization = False, level = None):
         self.dt = .05
         self.max_angular_velocity = 1.0
-        self.min_velocity = 1.5
-        self.max_velocity = 4.0
+        self.min_velocity = 1.0
+        self.max_velocity = 8.0
         self.x_target = 0.
         self.y_target = 0.
         self.v_target = 0.0
@@ -38,6 +38,8 @@ class MovingTarget(gym.Env):
         self.reward_range = 2
         self.visualization = visualization
         self.level = level
+        self.max_timesteps = max_timesteps
+        self.timesteps = 0
         # self.metadata = {'render.modes': ['human']}
 
         # self.action_space = spaces.Box(
@@ -83,6 +85,7 @@ class MovingTarget(gym.Env):
 
 
     def step(self, action1):
+        self.timesteps += 1
         dt = self.dt
         info = dict()
         done = False
@@ -118,18 +121,22 @@ class MovingTarget(gym.Env):
 
         diff_angle = angle_normalize(psi1-self.psi_target)
 
-        if x1 > self.map_lim or x1 < -self.map_lim or y1 > self.map_lim or y1 < -self.map_lim:
-            reward = -0.9
+        if distance >= 50:
+            reward = -1.0
+            done = True
+        elif x1 > 1.25*self.map_lim or x1 < -1.25*self.map_lim or y1 > 1.25*self.map_lim or y1 < -1.25*self.map_lim:
+            reward = -1.0
+            done = True
+        elif x1 > self.map_lim or x1 < -self.map_lim or y1 > self.map_lim or y1 < -self.map_lim:
+            reward = -1.0
+            # done = True
             # print (f"\nPlane {self.name1} is out of map!")
         elif distance <= 5.0:
             reward = -0.8
-            # print (f"\nPlane {self.name1} and {self.name2} crashed!")
-        elif distance >= 50.0:
-            reward = -1.0
-            done = True
+            # print (f"\nPlane {self.name1} and {self.name2} crashed!") 
         else:
             # reward = np.clip(-0.4*distance / max_dist -0.6*np.abs(diff_angle_1)/(2*np.pi), -1.0, 1.0)
-            reward = np.clip(-0.5*distance / max_dist - 0.5*np.abs(diff_angle) / np.pi + 0.6 * u_linear1/self.max_velocity, -1.0, 1.0)
+            reward = np.clip(-0.5*distance / max_dist - 0.5*np.abs(diff_angle) / np.pi + 0.2 * u_linear1/self.max_velocity, -1.0, 1.0)
             if distance <= self.dog_fight_range:
                 if end_angle_1 > start_angle_1:
                     if start_angle_1 < diff_angle_1 < end_angle_1:
@@ -158,6 +165,8 @@ class MovingTarget(gym.Env):
                 reward = 0.0
         
         
+        if self.timesteps >= self.max_timesteps:
+            done = True
 
 
         # To restrain the position of plane
@@ -194,8 +203,10 @@ class MovingTarget(gym.Env):
         return obs_state1
 
     def reset(self):
+        self.timesteps = 0
         x_ind = np.random.randint(0,5)
         y_ind = np.random.randint(0,5)
+
         map_lim_1 = -self.map_lim + x_ind * 20
         map_lim_2 = -self.map_lim + (x_ind + 1) * 20
         map_lim_1 = -self.map_lim + y_ind * 20
@@ -218,7 +229,7 @@ class MovingTarget(gym.Env):
         if self.level == "level1":
             self.v_target = 0
         else:
-            self.v_target = self.np_random.uniform(low=1.5, high=4.0)
+            self.v_target = self.np_random.uniform(low=1.0, high=6.0)
         diff_angle = angle_normalize(psi1-self.psi_target)
 
         distance = np.sqrt((self.x_target - x1)**2 + (self.y_target - y1)**2)
@@ -227,10 +238,6 @@ class MovingTarget(gym.Env):
 
         return self._get_obs(state1 = self.state1)
 
-
-        
-
-        
 
     def render(self, mode='human'):
         if self.viewer is None:
