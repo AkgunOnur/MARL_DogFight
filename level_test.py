@@ -10,7 +10,6 @@ from matplotlib import pyplot as plt
 from numpy.random import default_rng
 
 from moving_target_env import MovingTarget
-from dog_fight_env import DogFight
 import torch.nn as nn
 from stable_baselines3.common.env_checker import check_env
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
@@ -22,7 +21,6 @@ from stable_baselines3.common import results_plotter
 from stable_baselines3.common.results_plotter import ts2xy
 from stable_baselines3.common.monitor import load_results, Monitor
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from utils import *
 
 
 

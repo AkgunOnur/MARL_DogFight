@@ -14,7 +14,7 @@ from gym.utils import seeding
 from moving_target_env import MovingTarget
 import torch.nn as nn
 from stable_baselines3.common.env_checker import check_env
-from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoRemarkableImprovement, StopTrainingOnNoModelImprovement
+from callbacks import EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoRemarkableImprovement, StopTrainingOnNoModelImprovement
 from stable_baselines3 import A2C, PPO, DQN, SAC, DDPG, TD3
 from stable_baselines3.common.vec_env import DummyVecEnv, SubprocVecEnv, VecMonitor, VecNormalize
 from env_util import make_vec_env
@@ -23,7 +23,6 @@ from stable_baselines3.common import results_plotter
 from stable_baselines3.common.results_plotter import ts2xy
 from stable_baselines3.common.monitor import load_results, Monitor
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-from utils import *
 
 
 level_map_ranges = {"level1": 20.0, "level2": 30.0, "level3": 60.0, "level4": 60.0, "level5":90.0}
